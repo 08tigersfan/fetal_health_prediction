@@ -1,0 +1,22 @@
+feature,description
+LB,baseline of the fetal heart rate in beats per minute
+AC,number of accelerations/second
+FM,number of fetal movements/second
+UC,number of uterine contractions/second
+DL,number of light decelerations/second
+DS,number of severe decelerations/second
+DP,number of prolonged decelerations/second
+ASTV,percentage of time with abnormal short term variability
+MSTV,mean value of short term variability
+ALTV,percentage of time with abnormal long term variability
+MLTV,mean value of long term variability
+Width ,width of fetal heart rate histogram
+Min ,minimum of fetal heart rate histogram
+Max,maximum of fetal heart rate histogram
+Nmax,number of fetal heart rate histogram peaks
+Nzeros,number of fetal heart rate histogram zeros
+Mode,fetal heart rate histogram mode
+Mean ,fetal heart rate histogram mean
+Median ,fetal heart rate histogram median
+Variance ,fetal heart rate histogram variance
+Tendency,fetal heart rate histogram tendency

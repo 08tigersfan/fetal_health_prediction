@@ -1,0 +1,317 @@
+---
+title: "Classifying Fetus Health from Cardiotocogram Measurements"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include = FALSE, warning = FALSE, cache = TRUE}
+library(caret)
+library(DMwR)
+library(ggthemes)
+library(gridExtra)
+library(knitr)
+library(neuralnet)
+library(paletteer)
+library(readxl)
+library(tidyverse)
+library(reshape)
+
+knitr::opts_chunk$set(echo = TRUE)
+RNGkind(sample.kind = "Rounding")
+path <- ""
+```
+
+# Data Setup
+
+```{r p0, cache = TRUE}
+# read in the data, select only the response variable and relevant features,
+# and drop empty rows and duplicate observations
+dat <- read_excel(paste0(path, "CTG.xls"), sheet = 3)
+dat = dat[, c(7:17, 19:28, 40)]
+dat = unique(dat[-c(1, 2128:2130), ])
+
+# convert the categorical variables to factors
+dat$Tendency = as.factor(dat$Tendency)
+dat$NSP = factor(ifelse(dat$NSP == 1, "N", ifelse(dat$NSP == 2, "S", "P")),
+                 levels = c("N", "S", "P"))
+```
+
+# Exploratory Data Analysis
+
+## Descriptions of Features
+
+```{r p1.0, echo = FALSE, cache = TRUE}
+feature_descriptions <- read.csv(paste0(path, "feature_descriptions.csv"))
+kable(feature_descriptions)
+```
+
+## Distribution of the Response
+N = Normal, S = Suspect, P = Pathological
+
+```{r p1.1, echo = FALSE, cache = TRUE}
+kable(table(dat$NSP), col.names = c("Fetus Health", "Count"))
+```
+
+## Relationships between the Response and Quantitative Features
+
+```{r p1.2, echo = FALSE, cache = TRUE}
+for (i in seq(1, 19, 2)) {
+  p1 = ggplot() +
+    geom_boxplot(aes(NSP, eval(as.symbol(names(dat)[i]))), data = dat, fill = "dodgerblue") +
+    theme_bw() +
+    labs(y = names(dat)[i]) +
+    theme(axis.title.y = element_text(size = 14),
+          axis.title.x = element_blank(),
+          axis.text.y = element_text(size = 12),
+          axis.text.x = element_text(size = 12))
+
+  p2 = ggplot() +
+    geom_boxplot(aes(NSP, eval(as.symbol(names(dat)[i+1]))), data = dat, fill = "dodgerblue") +
+    theme_bw() +
+    labs(y = names(dat)[i+1]) +
+    theme(axis.title.y = element_text(size = 14),
+          axis.title.x = element_blank(),
+          axis.text.y = element_text(size = 12),
+          axis.text.x = element_text(size = 12))
+  
+  grid.arrange(p1, p2, ncol = 2)
+}
+rm(p1, p2, i)
+```
+
+## Relationship between the Response and the Qualitative Tendency Feature
+
+```{r p1.3, echo = FALSE, cache = TRUE}
+ggplot() +
+  geom_bar(aes(x = NSP, fill = Tendency), data = dat) +
+  theme_bw() +
+  labs(y = "Count") +
+  theme(axis.title.y = element_text(size = 14),
+        axis.title.x = element_blank(),
+        legend.title = element_text(size = 14),
+        axis.text.y = element_text(size = 12),
+        axis.text.x = element_text(size = 12),
+        legend.text = element_text(size = 12)) +
+  scale_fill_discrete(type = c("darkorange", "darkorchid", "forestgreen"))
+```
+
+## Relationships between the Quantitative Features
+
+```{r p1.4, echo = FALSE, warning = FALSE, cache = TRUE}
+cormat <- cor(dat[, -(21:22)])
+cormat[upper.tri(cormat)] <- NA
+cormat <- melt(cormat)
+cormat <- cormat[complete.cases(cormat) & cormat$X1 != cormat$X2, ]
+
+ggplot() +
+  geom_tile(aes(X1, X2, fill = value), data = cormat, color = "black") +
+  theme_bw() +
+  labs(fill = "Pearson\nCorrelation") +
+  theme(axis.title.y = element_blank(),
+        axis.title.x = element_blank(),
+        legend.title = element_text(size = 14),
+        axis.text.y = element_text(size = 12),
+        axis.text.x = element_text(size = 12, angle = 45, vjust = 1, hjust = 1),
+        legend.text = element_text(size = 12)) +
+  scale_fill_paletteer_c("ggthemes::Classic Red-White-Green", limits = c(-1, 1))
+```
+
+# Creating a Balanced Dataset
+
+## Partitioning the Data
+
+```{r p2.0, cache = TRUE}
+# convert the Tendency feature into three dummy variables for model building
+dat$TendencyLeft = ifelse(dat$Tendency == "-1", 1, 0)
+dat$TendencySymmetric = ifelse(dat$Tendency == "0", 1, 0)
+dat$TendencyRight = ifelse(dat$Tendency == "1", 1, 0)
+dat = dat[, c(1:20, 23:25, 22)]
+
+# partition the data into training and test sets
+set.seed(1)
+train.index = sample(nrow(dat), 0.7*nrow(dat))
+train.data = dat[train.index, ]
+test.data = dat[-train.index, ]
+```
+
+### Distribution of the Training Data Response
+
+```{r p2.1, echo = FALSE, cache = TRUE}
+kable(table(train.data$NSP), col.names = c("Fetus Health", "Count"))
+```
+
+### Distribution of the Test Data Response
+
+```{r p2.2, echo = FALSE, cache = TRUE}
+kable(table(test.data$NSP), col.names = c("Fetus Health", "Count"))
+```
+
+## Perform Oversampling
+
+Oversample the "P" class by generating 250 synthetic observations for a total of 375 (3x as many observations than the original training set). Oversample the "S" class by generating 171 synthetic observations, also for a total of 375. Undersample the "N" class.
+
+```{r p2.3, cache = TRUE}
+set.seed(2)
+overNS <- SMOTE(NSP ~ .,
+                data.frame(train.data %>% filter(NSP != "P") %>% mutate(NSP = as.factor(as.character(NSP)))),
+                perc.under = 219.5,
+                perc.over = 84,
+                k = 5)
+overP <- SMOTE(NSP ~ .,
+               data.frame(train.data %>% filter(NSP != "S") %>% mutate(NSP = as.factor(as.character(NSP)))),
+               perc.under = 0,
+               perc.over = 200,
+               k = 5)
+over <- bind_rows(overNS, overP)
+rm(overNS, overP)
+kable(table(over$NSP), col.names = c("Fetus Health", "Count"))
+```
+
+# Model Building
+
+## Neural Network
+
+### Oversampled Dataset
+
+```{r p3.0, cache = TRUE}
+set.seed(3)
+train_control <- trainControl(method = "cv", number = 10)
+tune.grid <- expand.grid(size = seq(1, 23, 1),
+                         decay = seq(0.1, 0.5, 0.1))
+no.print <- capture.output(
+  overNN <- train(NSP ~ ., data = over, method = "nnet",
+                  preProc = c("center", "scale"),
+                  trControl = train_control, tuneGrid = tune.grid)
+)
+overNN$bestTune
+
+pred.test = predict(overNN, test.data)
+confusionMatrix(pred.test, test.data$NSP)
+```
+
+### Original Dataset
+
+```{r p3.1, cache = TRUE}
+set.seed(4)
+train_control <- trainControl(method = "cv", number = 10)
+tune.grid <- expand.grid(size = seq(1, 23, 1),
+                         decay = seq(0.1, 0.5, 0.1))
+no.print <- capture.output(
+  origNN <- train(NSP ~ ., data = train.data, method = "nnet",
+                  preProc = c("center", "scale"),
+                  trControl = train_control, tuneGrid = tune.grid)
+)
+origNN$bestTune
+
+pred.test = predict(origNN, test.data)
+confusionMatrix(pred.test, test.data$NSP)
+```
+
+### Variable Importance Scores
+
+```{r p3.2, cache = TRUE}
+varImp(overNN)
+varImp(origNN)
+```
+
+## Random Forest Models
+
+### Oversampled Dataset
+
+```{r p3.3, cache = TRUE}
+set.seed(5)
+train_control <- trainControl(method = "cv", number = 10)
+overRF <- train(NSP ~ ., data = over, method = "rf",
+                trControl = train_control, tuneGrid = data.frame(mtry = 1:12))
+overRF$bestTune
+
+pred.test = predict(overRF$finalModel, test.data, type = 'class')
+confusionMatrix(pred.test, test.data$NSP)
+```
+
+### Original Dataset
+
+```{r p3.4, cache = TRUE}
+set.seed(6)
+train_control <- trainControl(method = "cv", number = 10)
+origRF <- train(NSP ~ ., data = train.data, method = "rf",
+                trControl = train_control, tuneGrid = data.frame(mtry = 1:12))
+origRF$bestTune
+
+pred.test = predict(origRF$finalModel, test.data, type = 'class')
+confusionMatrix(pred.test, test.data$NSP)
+```
+
+### Variable Importance Scores
+
+```{r p3.5, echo = FALSE, cache = TRUE}
+plot(varImp(overRF), main = "Random Forest w/ Oversampled Dataset")
+plot(varImp(origRF), main = "Random Forest w/ Original Dataset")
+```
+
+## Adaboost Models
+
+### Oversampled Dataset
+
+```{r p3.6, cache = TRUE}
+set.seed(7)
+train_control <- trainControl(method = "cv", number = 10)
+overAda <- train(NSP ~ ., data = over, method = "AdaBoost.M1",
+                 trControl = train_control, tuneLength = 5)
+overAda$bestTune
+
+pred.test = predict(overAda, test.data)
+confusionMatrix(pred.test, test.data$NSP)
+```
+
+### Original Dataset
+
+```{r p3.7, cache = TRUE}
+set.seed(8)
+train_control <- trainControl(method = "cv", number = 10)
+origAda <- train(NSP ~ ., data = train.data, method = "AdaBoost.M1",
+                 trControl = train_control, tuneLength = 5)
+origAda$bestTune
+
+pred.test = predict(origAda, test.data)
+confusionMatrix(pred.test, test.data$NSP)
+```
+
+### Variable Importance Scores
+
+```{r p3.8, cache = TRUE}
+plot(varImp(overAda), main = "Adaboost w/ Oversampled Dataset")
+plot(varImp(origAda), main = "Adaboost w/ Original Dataset")
+```
+
+# Post hoc Plots
+
+```{r p3.9, echo = FALSE, cache = TRUE}
+ggplot() +
+    geom_point(aes(x = ASTV, y = ALTV, color = NSP), data = dat) +
+    labs(title = "Fetal Health as a Function of\nAbnormal Long Term & Short Term Variability") +
+    theme_bw() +
+    theme(plot.title = element_text(size = 18),
+          axis.title.y = element_text(size = 16),
+          axis.title.x = element_text(size = 16),
+          legend.title = element_text(size = 16),
+          axis.text.y = element_text(size = 14),
+          axis.text.x = element_text(size = 14),
+          legend.text = element_text(size = 14)) +
+    scale_color_manual(values = c("#00BA38", "#619CFF", "#F8766D"))
+
+ggplot() +
+    geom_point(aes(x = Mean, y = AC, color = NSP), data = dat) +
+    labs(title = "Fetal Health as a Function of\nAccelerations/Second & Mean Heart Rate") +
+    theme_bw() +
+    theme(plot.title = element_text(size = 18),
+          axis.title.y = element_text(size = 16),
+          axis.title.x = element_text(size = 16),
+          legend.title = element_text(size = 16),
+          axis.text.y = element_text(size = 14),
+          axis.text.x = element_text(size = 14),
+          legend.text = element_text(size = 14)) +
+  scale_color_manual(values = c("#00BA38", "#619CFF", "#F8766D"))
+```
