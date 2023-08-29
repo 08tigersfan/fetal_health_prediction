@@ -20,7 +20,7 @@ library(reshape)
 
 knitr::opts_chunk$set(echo = TRUE)
 RNGkind(sample.kind = "Rounding")
-path <- ""
+path <- "C:/Users/jjard/Desktop/projects/fetal_health_prediction/"
 ```
 
 # Data Setup
@@ -130,7 +130,7 @@ dat$TendencyRight = ifelse(dat$Tendency == "1", 1, 0)
 dat = dat[, c(1:20, 23:25, 22)]
 
 # partition the data into training and test sets
-set.seed(1)
+set.seed(0)
 train.index = sample(nrow(dat), 0.7*nrow(dat))
 train.data = dat[train.index, ]
 test.data = dat[-train.index, ]
@@ -150,10 +150,10 @@ kable(table(test.data$NSP), col.names = c("Fetus Health", "Count"))
 
 ## Perform Oversampling
 
-Oversample the "P" class by generating 250 synthetic observations for a total of 375 (3x as many observations than the original training set). Oversample the "S" class by generating 171 synthetic observations, also for a total of 375. Undersample the "N" class.
+Oversample the "P" class for a total of 375 observations (3x as many observations than the original training set). Oversample the "S" class and undersample the "N" class to balance the dataset.
 
 ```{r p2.3, cache = TRUE}
-set.seed(2)
+set.seed(1)
 overNS <- SMOTE(NSP ~ .,
                 data.frame(train.data %>% filter(NSP != "P") %>% mutate(NSP = as.factor(as.character(NSP)))),
                 perc.under = 219.5,
@@ -176,7 +176,7 @@ kable(table(over$NSP), col.names = c("Fetus Health", "Count"))
 ### Oversampled Dataset
 
 ```{r p3.0, cache = TRUE}
-set.seed(3)
+set.seed(2)
 train_control <- trainControl(method = "cv", number = 10)
 tune.grid <- expand.grid(size = seq(1, 23, 1),
                          decay = seq(0.1, 0.5, 0.1))
@@ -194,7 +194,7 @@ confusionMatrix(pred.test, test.data$NSP)
 ### Original Dataset
 
 ```{r p3.1, cache = TRUE}
-set.seed(4)
+set.seed(3)
 train_control <- trainControl(method = "cv", number = 10)
 tune.grid <- expand.grid(size = seq(1, 23, 1),
                          decay = seq(0.1, 0.5, 0.1))
@@ -221,7 +221,7 @@ varImp(origNN)
 ### Oversampled Dataset
 
 ```{r p3.3, cache = TRUE}
-set.seed(5)
+set.seed(4)
 train_control <- trainControl(method = "cv", number = 10)
 overRF <- train(NSP ~ ., data = over, method = "rf",
                 trControl = train_control, tuneGrid = data.frame(mtry = 1:12))
@@ -234,7 +234,7 @@ confusionMatrix(pred.test, test.data$NSP)
 ### Original Dataset
 
 ```{r p3.4, cache = TRUE}
-set.seed(6)
+set.seed(5)
 train_control <- trainControl(method = "cv", number = 10)
 origRF <- train(NSP ~ ., data = train.data, method = "rf",
                 trControl = train_control, tuneGrid = data.frame(mtry = 1:12))
@@ -256,7 +256,7 @@ plot(varImp(origRF), main = "Random Forest w/ Original Dataset")
 ### Oversampled Dataset
 
 ```{r p3.6, cache = TRUE}
-set.seed(7)
+set.seed(6)
 train_control <- trainControl(method = "cv", number = 10)
 overAda <- train(NSP ~ ., data = over, method = "AdaBoost.M1",
                  trControl = train_control, tuneLength = 5)
@@ -269,7 +269,7 @@ confusionMatrix(pred.test, test.data$NSP)
 ### Original Dataset
 
 ```{r p3.7, cache = TRUE}
-set.seed(8)
+set.seed(7)
 train_control <- trainControl(method = "cv", number = 10)
 origAda <- train(NSP ~ ., data = train.data, method = "AdaBoost.M1",
                  trControl = train_control, tuneLength = 5)

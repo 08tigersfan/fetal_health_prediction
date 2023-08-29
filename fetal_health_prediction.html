@@ -1673,7 +1673,7 @@ dat$TendencyRight = ifelse(dat$Tendency == &quot;1&quot;, 1, 0)
 dat = dat[, c(1:20, 23:25, 22)]
 
 # partition the data into training and test sets
-set.seed(1)
+set.seed(0)
 train.index = sample(nrow(dat), 0.7*nrow(dat))
 train.data = dat[train.index, ]
 test.data = dat[-train.index, ]</code></pre>
@@ -1689,15 +1689,15 @@ test.data = dat[-train.index, ]</code></pre>
 <tbody>
 <tr class="odd">
 <td align="left">N</td>
-<td align="right">1135</td>
+<td align="right">1149</td>
 </tr>
 <tr class="even">
 <td align="left">S</td>
-<td align="right">211</td>
+<td align="right">204</td>
 </tr>
 <tr class="odd">
 <td align="left">P</td>
-<td align="right">132</td>
+<td align="right">125</td>
 </tr>
 </tbody>
 </table>
@@ -1714,15 +1714,15 @@ test.data = dat[-train.index, ]</code></pre>
 <tbody>
 <tr class="odd">
 <td align="left">N</td>
-<td align="right">511</td>
+<td align="right">497</td>
 </tr>
 <tr class="even">
 <td align="left">S</td>
-<td align="right">81</td>
+<td align="right">88</td>
 </tr>
 <tr class="odd">
 <td align="left">P</td>
-<td align="right">42</td>
+<td align="right">49</td>
 </tr>
 </tbody>
 </table>
@@ -1730,11 +1730,10 @@ test.data = dat[-train.index, ]</code></pre>
 </div>
 <div id="perform-oversampling" class="section level2">
 <h2>Perform Oversampling</h2>
-<p>Oversample the “P” class by generating 250 synthetic observations for
-a total of 375 (3x as many observations than the original training set).
-Oversample the “S” class by generating 171 synthetic observations, also
-for a total of 375. Undersample the “N” class.</p>
-<pre class="r"><code>set.seed(2)
+<p>Oversample the “P” class for a total of 375 observations (3x as many
+observations than the original training set). Oversample the “S” class
+and undersample the “N” class to balance the dataset.</p>
+<pre class="r"><code>set.seed(1)
 overNS &lt;- SMOTE(NSP ~ .,
                 data.frame(train.data %&gt;% filter(NSP != &quot;P&quot;) %&gt;% mutate(NSP = as.factor(as.character(NSP)))),
                 perc.under = 219.5,
@@ -1758,15 +1757,15 @@ kable(table(over$NSP), col.names = c(&quot;Fetus Health&quot;, &quot;Count&quot;
 <tbody>
 <tr class="odd">
 <td align="left">N</td>
-<td align="right">388</td>
+<td align="right">375</td>
 </tr>
 <tr class="even">
 <td align="left">S</td>
-<td align="right">388</td>
+<td align="right">375</td>
 </tr>
 <tr class="odd">
 <td align="left">P</td>
-<td align="right">396</td>
+<td align="right">375</td>
 </tr>
 </tbody>
 </table>
@@ -1778,7 +1777,7 @@ kable(table(over$NSP), col.names = c(&quot;Fetus Health&quot;, &quot;Count&quot;
 <h2>Neural Network</h2>
 <div id="oversampled-dataset" class="section level3">
 <h3>Oversampled Dataset</h3>
-<pre class="r"><code>set.seed(3)
+<pre class="r"><code>set.seed(2)
 train_control &lt;- trainControl(method = &quot;cv&quot;, number = 10)
 tune.grid &lt;- expand.grid(size = seq(1, 23, 1),
                          decay = seq(0.1, 0.5, 0.1))
@@ -1789,43 +1788,43 @@ no.print &lt;- capture.output(
 )
 overNN$bestTune</code></pre>
 <pre><code>##     size decay
-## 106   22   0.1</code></pre>
+## 101   21   0.1</code></pre>
 <pre class="r"><code>pred.test = predict(overNN, test.data)
 confusionMatrix(pred.test, test.data$NSP)</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
 ##           Reference
 ## Prediction   N   S   P
-##          N 446   8   3
-##          S  63  70   2
-##          P   2   3  37
+##          N 454   6   0
+##          S  37  75   6
+##          P   6   7  43
 ## 
 ## Overall Statistics
 ##                                           
-##                Accuracy : 0.8722          
-##                  95% CI : (0.8437, 0.8972)
-##     No Information Rate : 0.806           
-##     P-Value [Acc &gt; NIR] : 6.218e-06       
+##                Accuracy : 0.9022          
+##                  95% CI : (0.8764, 0.9242)
+##     No Information Rate : 0.7839          
+##     P-Value [Acc &gt; NIR] : 2.364e-15       
 ##                                           
-##                   Kappa : 0.6702          
+##                   Kappa : 0.7546          
 ##                                           
-##  Mcnemar&#39;s Test P-Value : 2.454e-09       
+##  Mcnemar&#39;s Test P-Value : 2.956e-06       
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: N Class: S Class: P
-## Sensitivity            0.8728   0.8642  0.88095
-## Specificity            0.9106   0.8825  0.99155
-## Pos Pred Value         0.9759   0.5185  0.88095
-## Neg Pred Value         0.6328   0.9780  0.99155
-## Prevalence             0.8060   0.1278  0.06625
-## Detection Rate         0.7035   0.1104  0.05836
-## Detection Prevalence   0.7208   0.2129  0.06625
-## Balanced Accuracy      0.8917   0.8733  0.93625</code></pre>
+## Sensitivity            0.9135   0.8523  0.87755
+## Specificity            0.9562   0.9212  0.97778
+## Pos Pred Value         0.9870   0.6356  0.76786
+## Neg Pred Value         0.7529   0.9748  0.98962
+## Prevalence             0.7839   0.1388  0.07729
+## Detection Rate         0.7161   0.1183  0.06782
+## Detection Prevalence   0.7256   0.1861  0.08833
+## Balanced Accuracy      0.9348   0.8868  0.92766</code></pre>
 </div>
 <div id="original-dataset" class="section level3">
 <h3>Original Dataset</h3>
-<pre class="r"><code>set.seed(4)
+<pre class="r"><code>set.seed(3)
 train_control &lt;- trainControl(method = &quot;cv&quot;, number = 10)
 tune.grid &lt;- expand.grid(size = seq(1, 23, 1),
                          decay = seq(0.1, 0.5, 0.1))
@@ -1836,39 +1835,39 @@ no.print &lt;- capture.output(
 )
 origNN$bestTune</code></pre>
 <pre><code>##    size decay
-## 78   16   0.3</code></pre>
+## 53   11   0.3</code></pre>
 <pre class="r"><code>pred.test = predict(origNN, test.data)
 confusionMatrix(pred.test, test.data$NSP)</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
 ##           Reference
 ## Prediction   N   S   P
-##          N 489  18   3
-##          S  21  62   6
-##          P   1   1  33
+##          N 483  11   4
+##          S  11  71   7
+##          P   3   6  38
 ## 
 ## Overall Statistics
 ##                                           
-##                Accuracy : 0.9211          
-##                  95% CI : (0.8973, 0.9409)
-##     No Information Rate : 0.806           
-##     P-Value [Acc &gt; NIR] : 4.323e-16       
+##                Accuracy : 0.9338          
+##                  95% CI : (0.9115, 0.9518)
+##     No Information Rate : 0.7839          
+##     P-Value [Acc &gt; NIR] : &lt;2e-16          
 ##                                           
-##                   Kappa : 0.7611          
+##                   Kappa : 0.8155          
 ##                                           
-##  Mcnemar&#39;s Test P-Value : 0.1869          
+##  Mcnemar&#39;s Test P-Value : 0.9743          
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: N Class: S Class: P
-## Sensitivity            0.9569  0.76543  0.78571
-## Specificity            0.8293  0.95118  0.99662
-## Pos Pred Value         0.9588  0.69663  0.94286
-## Neg Pred Value         0.8226  0.96514  0.98497
-## Prevalence             0.8060  0.12776  0.06625
-## Detection Rate         0.7713  0.09779  0.05205
-## Detection Prevalence   0.8044  0.14038  0.05521
-## Balanced Accuracy      0.8931  0.85830  0.89117</code></pre>
+## Sensitivity            0.9718   0.8068  0.77551
+## Specificity            0.8905   0.9670  0.98462
+## Pos Pred Value         0.9699   0.7978  0.80851
+## Neg Pred Value         0.8971   0.9688  0.98126
+## Prevalence             0.7839   0.1388  0.07729
+## Detection Rate         0.7618   0.1120  0.05994
+## Detection Prevalence   0.7855   0.1404  0.07413
+## Balanced Accuracy      0.9312   0.8869  0.88006</code></pre>
 </div>
 <div id="variable-importance-scores" class="section level3">
 <h3>Variable Importance Scores</h3>
@@ -1932,49 +1931,49 @@ confusionMatrix(pred.test, test.data$NSP)</code></pre>
 <h2>Random Forest Models</h2>
 <div id="oversampled-dataset-1" class="section level3">
 <h3>Oversampled Dataset</h3>
-<pre class="r"><code>set.seed(5)
+<pre class="r"><code>set.seed(4)
 train_control &lt;- trainControl(method = &quot;cv&quot;, number = 10)
 overRF &lt;- train(NSP ~ ., data = over, method = &quot;rf&quot;,
                 trControl = train_control, tuneGrid = data.frame(mtry = 1:12))
 overRF$bestTune</code></pre>
-<pre><code>##    mtry
-## 12   12</code></pre>
+<pre><code>##   mtry
+## 6    6</code></pre>
 <pre class="r"><code>pred.test = predict(overRF$finalModel, test.data, type = &#39;class&#39;)
 confusionMatrix(pred.test, test.data$NSP)</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
 ##           Reference
 ## Prediction   N   S   P
-##          N 473   8   1
-##          S  37  68   0
-##          P   1   5  41
+##          N 464   5   2
+##          S  29  82   2
+##          P   4   1  45
 ## 
 ## Overall Statistics
 ##                                           
-##                Accuracy : 0.918           
-##                  95% CI : (0.8938, 0.9381)
-##     No Information Rate : 0.806           
-##     P-Value [Acc &gt; NIR] : 3.292e-15       
+##                Accuracy : 0.9322          
+##                  95% CI : (0.9097, 0.9505)
+##     No Information Rate : 0.7839          
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
 ##                                           
-##                   Kappa : 0.7729          
+##                   Kappa : 0.8247          
 ##                                           
-##  Mcnemar&#39;s Test P-Value : 2.901e-05       
+##  Mcnemar&#39;s Test P-Value : 0.0004523       
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: N Class: S Class: P
-## Sensitivity            0.9256   0.8395  0.97619
-## Specificity            0.9268   0.9331  0.98986
-## Pos Pred Value         0.9813   0.6476  0.87234
-## Neg Pred Value         0.7500   0.9754  0.99830
-## Prevalence             0.8060   0.1278  0.06625
-## Detection Rate         0.7461   0.1073  0.06467
-## Detection Prevalence   0.7603   0.1656  0.07413
-## Balanced Accuracy      0.9262   0.8863  0.98303</code></pre>
+## Sensitivity            0.9336   0.9318  0.91837
+## Specificity            0.9489   0.9432  0.99145
+## Pos Pred Value         0.9851   0.7257  0.90000
+## Neg Pred Value         0.7975   0.9885  0.99315
+## Prevalence             0.7839   0.1388  0.07729
+## Detection Rate         0.7319   0.1293  0.07098
+## Detection Prevalence   0.7429   0.1782  0.07886
+## Balanced Accuracy      0.9413   0.9375  0.95491</code></pre>
 </div>
 <div id="original-dataset-1" class="section level3">
 <h3>Original Dataset</h3>
-<pre class="r"><code>set.seed(6)
+<pre class="r"><code>set.seed(5)
 train_control &lt;- trainControl(method = &quot;cv&quot;, number = 10)
 origRF &lt;- train(NSP ~ ., data = train.data, method = &quot;rf&quot;,
                 trControl = train_control, tuneGrid = data.frame(mtry = 1:12))
@@ -1987,32 +1986,32 @@ confusionMatrix(pred.test, test.data$NSP)</code></pre>
 ## 
 ##           Reference
 ## Prediction   N   S   P
-##          N 499  13   3
-##          S  12  66   1
-##          P   0   2  38
+##          N 489  17   3
+##          S   6  71   3
+##          P   2   0  43
 ## 
 ## Overall Statistics
 ##                                           
 ##                Accuracy : 0.9511          
 ##                  95% CI : (0.9313, 0.9665)
-##     No Information Rate : 0.806           
-##     P-Value [Acc &gt; NIR] : &lt;2e-16          
+##     No Information Rate : 0.7839          
+##     P-Value [Acc &gt; NIR] : &lt; 2e-16         
 ##                                           
-##                   Kappa : 0.8496          
+##                   Kappa : 0.8594          
 ##                                           
-##  Mcnemar&#39;s Test P-Value : 0.3376          
+##  Mcnemar&#39;s Test P-Value : 0.03739         
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: N Class: S Class: P
-## Sensitivity            0.9765   0.8148  0.90476
-## Specificity            0.8699   0.9765  0.99662
-## Pos Pred Value         0.9689   0.8354  0.95000
-## Neg Pred Value         0.8992   0.9730  0.99327
-## Prevalence             0.8060   0.1278  0.06625
-## Detection Rate         0.7871   0.1041  0.05994
-## Detection Prevalence   0.8123   0.1246  0.06309
-## Balanced Accuracy      0.9232   0.8957  0.95069</code></pre>
+## Sensitivity            0.9839   0.8068  0.87755
+## Specificity            0.8540   0.9835  0.99658
+## Pos Pred Value         0.9607   0.8875  0.95556
+## Neg Pred Value         0.9360   0.9693  0.98981
+## Prevalence             0.7839   0.1388  0.07729
+## Detection Rate         0.7713   0.1120  0.06782
+## Detection Prevalence   0.8028   0.1262  0.07098
+## Balanced Accuracy      0.9190   0.8952  0.93707</code></pre>
 </div>
 <div id="variable-importance-scores-1" class="section level3">
 <h3>Variable Importance Scores</h3>
@@ -2023,87 +2022,87 @@ confusionMatrix(pred.test, test.data$NSP)</code></pre>
 <h2>Adaboost Models</h2>
 <div id="oversampled-dataset-2" class="section level3">
 <h3>Oversampled Dataset</h3>
-<pre class="r"><code>set.seed(7)
+<pre class="r"><code>set.seed(6)
 train_control &lt;- trainControl(method = &quot;cv&quot;, number = 10)
 overAda &lt;- train(NSP ~ ., data = over, method = &quot;AdaBoost.M1&quot;,
                  trControl = train_control, tuneLength = 5)
 overAda$bestTune</code></pre>
 <pre><code>##    mfinal maxdepth coeflearn
-## 48    150        5    Freund</code></pre>
+## 42    100        4    Freund</code></pre>
 <pre class="r"><code>pred.test = predict(overAda, test.data)
 confusionMatrix(pred.test, test.data$NSP)</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
 ##           Reference
 ## Prediction   N   S   P
-##          N 479   7   2
-##          S  32  73   0
-##          P   0   1  40
+##          N 459   5   2
+##          S  35  83   2
+##          P   3   0  45
 ## 
 ## Overall Statistics
-##                                           
-##                Accuracy : 0.9338          
-##                  95% CI : (0.9115, 0.9518)
-##     No Information Rate : 0.806           
-##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
-##                                           
-##                   Kappa : 0.813           
-##                                           
-##  Mcnemar&#39;s Test P-Value : 0.0002701       
+##                                          
+##                Accuracy : 0.9259         
+##                  95% CI : (0.9026, 0.945)
+##     No Information Rate : 0.7839         
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16      
+##                                          
+##                   Kappa : 0.8107         
+##                                          
+##  Mcnemar&#39;s Test P-Value : 1.784e-05      
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: N Class: S Class: P
-## Sensitivity            0.9374   0.9012  0.95238
-## Specificity            0.9268   0.9421  0.99831
-## Pos Pred Value         0.9816   0.6952  0.97561
-## Neg Pred Value         0.7808   0.9849  0.99663
-## Prevalence             0.8060   0.1278  0.06625
-## Detection Rate         0.7555   0.1151  0.06309
-## Detection Prevalence   0.7697   0.1656  0.06467
-## Balanced Accuracy      0.9321   0.9217  0.97535</code></pre>
+## Sensitivity            0.9235   0.9432  0.91837
+## Specificity            0.9489   0.9322  0.99487
+## Pos Pred Value         0.9850   0.6917  0.93750
+## Neg Pred Value         0.7738   0.9903  0.99317
+## Prevalence             0.7839   0.1388  0.07729
+## Detection Rate         0.7240   0.1309  0.07098
+## Detection Prevalence   0.7350   0.1893  0.07571
+## Balanced Accuracy      0.9362   0.9377  0.95662</code></pre>
 </div>
 <div id="original-dataset-2" class="section level3">
 <h3>Original Dataset</h3>
-<pre class="r"><code>set.seed(8)
+<pre class="r"><code>set.seed(7)
 train_control &lt;- trainControl(method = &quot;cv&quot;, number = 10)
 origAda &lt;- train(NSP ~ ., data = train.data, method = &quot;AdaBoost.M1&quot;,
                  trControl = train_control, tuneLength = 5)
 origAda$bestTune</code></pre>
 <pre><code>##    mfinal maxdepth coeflearn
-## 21     50        5   Breiman</code></pre>
+## 24    200        5   Breiman</code></pre>
 <pre class="r"><code>pred.test = predict(origAda, test.data)
 confusionMatrix(pred.test, test.data$NSP)</code></pre>
 <pre><code>## Confusion Matrix and Statistics
 ## 
 ##           Reference
 ## Prediction   N   S   P
-##          N 498  12   3
-##          S  13  67   1
-##          P   0   2  38
+##          N 488  11   3
+##          S   7  77   2
+##          P   2   0  44
 ## 
 ## Overall Statistics
 ##                                           
-##                Accuracy : 0.9511          
-##                  95% CI : (0.9313, 0.9665)
-##     No Information Rate : 0.806           
+##                Accuracy : 0.9606          
+##                  95% CI : (0.9423, 0.9743)
+##     No Information Rate : 0.7839          
 ##     P-Value [Acc &gt; NIR] : &lt;2e-16          
 ##                                           
-##                   Kappa : 0.8506          
+##                   Kappa : 0.8889          
 ##                                           
-##  Mcnemar&#39;s Test P-Value : 0.3376          
+##  Mcnemar&#39;s Test P-Value : 0.3781          
 ## 
 ## Statistics by Class:
 ## 
 ##                      Class: N Class: S Class: P
-## Sensitivity            0.9746   0.8272  0.90476
-## Specificity            0.8780   0.9747  0.99662
-## Pos Pred Value         0.9708   0.8272  0.95000
-## Neg Pred Value         0.8926   0.9747  0.99327
-## Prevalence             0.8060   0.1278  0.06625
-## Detection Rate         0.7855   0.1057  0.05994
-## Detection Prevalence   0.8091   0.1278  0.06309
-## Balanced Accuracy      0.9263   0.9009  0.95069</code></pre>
+## Sensitivity            0.9819   0.8750  0.89796
+## Specificity            0.8978   0.9835  0.99658
+## Pos Pred Value         0.9721   0.8953  0.95652
+## Neg Pred Value         0.9318   0.9799  0.99150
+## Prevalence             0.7839   0.1388  0.07729
+## Detection Rate         0.7697   0.1215  0.06940
+## Detection Prevalence   0.7918   0.1356  0.07256
+## Balanced Accuracy      0.9399   0.9293  0.94727</code></pre>
 </div>
 <div id="variable-importance-scores-2" class="section level3">
 <h3>Variable Importance Scores</h3>
